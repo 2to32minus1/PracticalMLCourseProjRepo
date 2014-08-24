@@ -8,8 +8,6 @@
 library( randomForest )
 cpScript <- function( subDir = "data" ) {
 
-    repoDir <- "D:/OldLaptop/D_Drive/JohnsHopkinsCoursera/8_PracticalMLCoursera/hw/CourseProjRepo"    
-
     # load data, create and split data frames, shuffle rows, results stored in d tuple
     d <- loadData( subDir, doPrint = TRUE )
     
