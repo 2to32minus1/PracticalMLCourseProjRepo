@@ -516,7 +516,7 @@ cpScript <- function( subDir = "data" ) {
         
     # RETURN LIST OF SELECTED VARIABLES FOR CALLER
     list( data=d, lmBest20Coeffs=lmBest20Coeffs, rf52=rf52, rf20=rf20,
-          rfcvOutput=rfcvOutput, predsrf52=predsrf52, predsRf20=predsRf20 )
+          rfcvOutput=rfcvOutput, predsRf52=predsRf52, predsRf20=predsRf20 )
 }
 
 ###########
