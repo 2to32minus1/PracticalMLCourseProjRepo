@@ -8,8 +8,6 @@
 library( randomForest )
 cpScript <- function( subDir = "data" ) {
 
-    repoDir <- "D:/OldLaptop/D_Drive/JohnsHopkinsCoursera/8_PracticalMLCoursera/hw/CourseProjRepo"    
-
     # load data, create and split data frames, shuffle rows, results stored in d tuple
     d <- loadData( subDir, doPrint = TRUE )
     
@@ -273,12 +271,12 @@ plotImportanceData <- function( varIndices, mdaVals, mdGiniVals, doPrint=FALSE )
     plot( varIndices, mdaVals, 
           xlab="Variable Index", 
           ylab="Importance MD Accuracy Value", 
-          main="MD Accuracy Importance of Variables",
+          main="Variable MD Accuracy/Importance",
           pch=21, col="blue", bg="red" )
     plot( varIndices, mdGiniVals,
           xlab="Variable Index", 
           ylab="Importance MD Gini Value", 
-          main="MD Gini Importance of Variables",
+          main="Variable MD Gini Importance",
           pch=21, col="blue", bg="red" )
     
     # plot to file as well
@@ -286,18 +284,16 @@ plotImportanceData <- function( varIndices, mdaVals, mdGiniVals, doPrint=FALSE )
     par( family = "sans" )
     par( mfrow = c( 1, 2 ) )
     plot( varIndices, mdaVals, 
-        xlab="Variable Index", 
-        ylab="Importance MD Accuracy Value", 
-        main="MD Accuracy Importance of Variables",
-        pch=21, col="blue", bg="red" )
+          xlab="Variable Index", 
+          ylab="Importance MD Accuracy Value", 
+          main="Variable MD Accuracy/Importance",
+          pch=21, col="blue", bg="red" )
     plot( varIndices, mdGiniVals,
-        xlab="Variable Index", 
-        ylab="Importance MD Gini Value", 
-        main="MD Gini Importance of Variables",
-        pch=21, col="blue", bg="red" )
+          xlab="Variable Index", 
+          ylab="Importance MD Gini Value", 
+          main="Variable MD Gini Importance",
+          pch=21, col="blue", bg="red" )
     dev.off()
-    if ( doPrint )
-        cat( "\n" )
 }
 
 ###########
