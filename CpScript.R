@@ -8,23 +8,32 @@
 library( randomForest )
 cpScript <- function( subDir = "data" ) {
 
-    # load data, create and split data frames, shuffle rows, results stored in d tuple
+    #### load data, create and split data frames, shuffle rows, results stored in d tuple
     d <- loadData( subDir, doPrint = TRUE )
     
-    # see if rfcv() variable importance useful for features selection
+    #### see if rfcv() variable importance useful for features selection
     evalRfcvVarImport( d$trainDf, nrows=2000, doPrint=TRUE )
     
-    # get sorted coefficients from Linear Model fit to see if useful
+    #### get sorted coefficients from Linear Model fit to see if useful
     # for feature selection
     lmBest20Coeffs <- getMostImportantLmCoeffs( d$trainDf, nrows=1000, doPrint=TRUE )
 
-    # fit Random Forests over a grid of ranges for params 'mtry' and 'ntree'
+    #### now use rfcv() to evaluate cross-validation error
+    pr( "---> computing rfcv() to estimate cross-validation error - this may take several minutes..." )
+    set.seed( 1 )
+    rfcvOutput <- rfcv( d$trainDf[, -53], d$trainDf[, 53] )
+    pr( "...done computing rfcv() output" )
+    pr( "rfcv() cross-validation estimates for training set vs. number variables used:")
+    pr( rfcvOutput$error.cv )    
+    cat( "\n" )
+    
+    #### fit Random Forests over a grid of ranges for params 'mtry' and 'ntree'
     # use full 52 features in training set
-    pr( "---> examining Random Forest performance for a range of 'mtry' and 'ntree' parameters..." )
+    pr( "---> find best Random Forest (52 features = rf52) for a range of 'mtry' and 'ntree' parameters..." )
     mtryVals <- c( 2, 5, 10 )
     ntreeVals <- c( 1, 2, 3, 5, 10, 20 )
     rf52 <- findBestRfParams( d$trainDf, mtryVals, ntreeVals, doPrint = TRUE ) # rf52 is a tuple
-    pr( "--> Random Forest accuracy values for evaluated (mtry, ntree) grid pairs:" )
+    pr( "--> Random Forest (rf52) accuracy values for evaluated (mtry, ntree) grid pairs:" )
     pr( "--> NOTE: row names are mtry values; column names are ntree values" )
     pr( "--> NOTE: matrix entries are classification accuracy on train set" )
     cat( "\n" )
@@ -34,71 +43,152 @@ cpScript <- function( subDir = "data" ) {
     pr( sprintf( "resultant rf52: train accuracy=%f mtry=%d ntree=%d OOB error=%f",
         rf52$bestAcc, rf52$bestMtry, rf52$bestNtree, getOob( rf52$bestRf ) ) )
     cat( "\n" )
-    
-    # now just print out the Random Forest to get confusion matrix and OOB error est.
-    pr( "---> printing best (rf52) Random Forest for above parameters: " )
+    # now print out the Random Forest to get confusion matrix and OOB error est.
+    pr( "---> printing best (rf52) Random Forest trained on 52 features for above parameters: " )
     pr( rf52$bestRf )
     cat( "\n" )
     
-    # now use rfcv() to evaluate cross-validation error
-    pr( "---> computing rfcv() cross-validation error - this may take several minutes..." )
-    set.seed( 1 )
-    rfcvOutput <- rfcv( d$trainDf[, -53], d$trainDf[, 53] )
-    pr( "...done computing rfcv() output" )
-    pr( "rfcv() cross-validation estimates for training set vs. number variables used:")
-    pr( rfcvOutput$error.cv )    
-    cat( "\n" )
-
-    # compute performance of rf52 best 52-feature random forest on T-E-S-T set
-    acc <- evalRf( rf52$bestRf, d$testDf )
-    pr( sprintf( "accuracy of best (rf52) Random Forest on 20%% TEST set: %f", acc ) )
-    cat( "\n" )
-
-    # additional exercise: find best 20-feature Random Forest using Linear Model top-20 coeffs
-    pr( "---> As additional exercise fit Random Forest to top-20 features from Linear Model" )
+    #### additional exercise: find best 20-feature Random Forest using Linear Model top-20 coeffs
+    pr( "---> As an additional exercise fit another Random Forest (rf20) to top-20 features from Linear Model" )
     lmBest20Coeffs[ 21 ] = "classe" # Need to append the 'classe' to feature list
     best20TrainDf <- d$trainDf[, lmBest20Coeffs ] # subset training set, only the 20 'top' features
     mtryVals <- c( 2, 5, 10 ) # use different parameter ranges as expect lower accuracy using fewer features
     ntreeVals <- c( 10, 50, 100, 200 ) # ditto
-    rf20 <- findBestRfParams( d$trainDf, mtryVals, ntreeVals, doPrint = TRUE )
-    pr( "--> Random Forest accuracy values for evaluated (mtry, ntree) grid pairs:" )
+    rf20 <- findBestRfParams( best20TrainDf, mtryVals, ntreeVals, doPrint = TRUE )
+    pr( "--> Random Forest (rf20) accuracy values for evaluated (mtry, ntree) grid pairs:" )
     pr( "--> NOTE: row names are mtry values; column names are ntree values" )
     pr( "--> NOTE: matrix entries are classification accuracy on train set" )
     cat( "\n" )
-
     pr( rf20$accMatrix )
     cat( "\n" )    
     pr( "--->parameters from best 20-feature Random Forest:" )
     pr( sprintf( "resultant rf20: train accuracy=%f mtry=%d ntree=%d OOB error=%f",
                  rf20$bestAcc, rf20$bestMtry, rf20$bestNtree, getOob( rf20$bestRf ) ) )
-    cat( "\n" )
-    
-    # PRINT BEST RANDOM FOREST (to get OOB and confusion matrix)
-    pr( "---> printing best Random Forest for above parameters: " )
+    cat( "\n" )    
+    # now print out the Random Forest to get confusion matrix and OOB error est.
+    pr( "---> printing best (rf20) Random Forest trained on 20 features for above parameters: " )
     pr( rf20$bestRf )
     cat( "\n" )    
 
-    # compute performance of rf20 Random Forest on T-E-S-T set (20% of train set rows)
-    pr( "---> evalute top-20 feature Random Forest: " )
+    #### compute performance of rf52 Random Forest on T-E-S-T set (20% of train set rows)
+    pr( "---> TEST set evaluation of 52-feature (rf52) Random Forest: " )
+    acc <- evalRf( rf52$bestRf, d$testDf )
+    pr( sprintf( "accuracy of best (rf52) Random Forest on 20%% TEST set: %f", acc ) )
+    cat( "\n" )
+
+    #### compute performance of rf20 Random Forest on T-E-S-T set (20% of train set rows)
+    pr( "---> TEST set evaluation of top-20 (rf2) feature Random Forest: " )
     acc <- evalRf( rf20$bestRf, d$testDf )
     pr( sprintf( "accuracy of best (rf20) Random Forest on 20%% TEST set: %f", acc ) )
     cat( "\n" )
 
-    # use rf52 to predict labels for course project 20-row data set (pml-testing.csv)
+    #### use rf52 to predict labels for course project 20-row data set (pml-testing.csv)
     pr( "---> use rf52 to predict labels for course project 20-row data set (pml-testing.csv" )
     predsRf52 <- predict( rf52$bestRf, d$predDf )
     pr( predsRf52 )
     cat( "\n")
 
-    # use rf20 to predict labels for course project 20-row data set (pml-testing.csv)
+    #### use rf20 to predict labels for course project 20-row data set (pml-testing.csv)
     pr( "---> use rf20 to predict labels for course project 20-row data set (pml-testing.csv" )
     predsRf20 <- predict( rf20$bestRf, d$predDf )
     pr( predsRf20 )
     cat( "\n")
         
-    # RETURN LIST OF SELECTED VARIABLES FOR CALLER
+    #### RETURN LIST OF SELECTED VARIABLES FOR CALLER
     list( data=d, lmBest20Coeffs=lmBest20Coeffs, rf52=rf52, rf20=rf20,
           rfcvOutput=rfcvOutput, predsRf52=predsRf52, predsRf20=predsRf20 )
+}
+
+###########
+# helper method to reduce line lengths
+pr <- function( msg ) {
+    print( msg, quote = FALSE )
+}
+
+###########
+# a function which returns the numeric index of column in a data frame given the column name
+getColIdx <- function( df, colName ) {
+    grep( colName, colnames( df ) )
+}
+
+###########
+# helper function to subset, coerce data
+prepDf <- function( df ) {
+    ## discard first 7 columns - may not be good for general data sets
+    df <- df[ , 8:ncol( df ) ]
+    ## discard columns with number na/blanks > num rows in data frame
+    colNaSums <- apply( df, 2, function(x) { length( which ( is.na(x) | x == "" ) ) } )
+    df <- df[ ,colNaSums < nrow(df)/2 ]
+    ## coerce integers to numeric
+    for ( i in 1:ncol( df ) ) {
+        if ( class( df[ 1, i ] ) == "integer" )
+            df[ , i ] <- as.numeric( df[ , i ] )
+    }
+    df # Caller must do the shuffling
+}
+
+###########
+# helper to de-clutter script code
+plotLmCoeffVals <- function( coefIdxs, coefVals, doPrint=FALSE ) {
+    
+    if ( doPrint )
+        pr( "plotting Linear Model coefficients sorted in decreasing order" )
+    
+    # plot to screen and knitr
+    plot( coefIdxs, coefVals, pch=21, col="blue", bg="red",
+          xlab="Linear Model Coef Index", 
+          ylab="LM Coef Value", 
+          main="Linear Model Coefficients" )
+    lines(coefIdxs, coefVals, col="blue" )
+    
+    # also plot to PNG file
+    png( "LmCoeff.png", height = 512, width = 512 )
+    par( family = "sans" )
+    plot( coefIdxs, coefVals, pch=21, col="blue", bg="red",
+          xlab="Linear Model Coef Index", 
+          ylab="LM Coef Value", 
+          main="Linear Model Coefficients" )
+    lines(coefIdxs, coefVals, col="blue" )
+    dev.off()    
+    
+    if ( doPrint )
+        cat( "\n" )
+}
+
+###########
+# helper to de-clutter script code
+plotImportanceData <- function( varIndices, mdaVals, mdGiniVals, doPrint=FALSE ) {
+    
+    if ( doPrint )
+        pr( "plotting Random Forest variable importance() metrics" )
+    
+    # plot to screen and knitr
+    plot( varIndices, mdaVals, 
+          xlab="Variable Index", 
+          ylab="Importance MD Accuracy Value", 
+          main="Variable MD Accuracy/Importance",
+          pch=21, col="blue", bg="red" )
+    plot( varIndices, mdGiniVals,
+          xlab="Variable Index", 
+          ylab="Importance MD Gini Value", 
+          main="Variable MD Gini Importance",
+          pch=21, col="blue", bg="red" )
+    
+    # plot to file as well
+    png( "RfImpVarMetrics.png", height = 512, width = 900 )
+    par( family = "sans" )
+    par( mfrow = c( 1, 2 ) )
+    plot( varIndices, mdaVals, 
+          xlab="Variable Index", 
+          ylab="Importance MD Accuracy Value", 
+          main="Variable MD Accuracy/Importance",
+          pch=21, col="blue", bg="red" )
+    plot( varIndices, mdGiniVals,
+          xlab="Variable Index", 
+          ylab="Importance MD Gini Value", 
+          main="Variable MD Gini Importance",
+          pch=21, col="blue", bg="red" )
+    dev.off()
 }
 
 ###########
@@ -122,8 +212,6 @@ getMostImportantLmCoeffs <- function( df, nrows=0, doPrint=FALSE ) {
     lm20MostImpFeatures <- names(sortedCoeffs)[2:21]  # skip intercept = coef[1]
     # plot linear model coefficients largest-to-smallest; skipping intercept coefficient
     plotLmCoeffVals( 2:nCoeffs, sortedCoeffs[2:nCoeffs], doPrint=doPrint )
-    if ( doPrint )
-        cat( "\n" )
     lmBest20Coeffs <- sortedCoeffNames[2:21]
 }
 
@@ -224,96 +312,4 @@ evalRf <- function( rf, df )  {
     predTestSet <- predict( rf, df ) # use Test set, NOT Cross-Validation set
     numAgree <- sum( predTestSet == df$classe )
     modelTestAccur <- numAgree/length( predTestSet )
-}
-
-###########
-# helper method to reduce line lengths
-pr <- function( msg ) {
-    print( msg, quote = FALSE )
-}
-
-###########
-# helper to de-clutter script code
-plotLmCoeffVals <- function( coefIdxs, coefVals, doPrint=FALSE ) {
-    
-    if ( doPrint )
-        pr( "plotting Linear Model coefficients sorted in decreasing order" )
-    
-    # plot to screen and knitr
-    plot( coefIdxs, coefVals, pch=21, col="blue", bg="red",
-          xlab="Linear Model Coef Index", 
-          ylab="LM Coef Value", 
-          main="Linear Model Coefficients" )
-    lines(coefIdxs, coefVals, col="blue" )
-
-    # also plot to PNG file
-    png( "LmCoeff.png", height = 512, width = 512 )
-    par( family = "sans" )
-    plot( coefIdxs, coefVals, pch=21, col="blue", bg="red",
-          xlab="Linear Model Coef Index", 
-          ylab="LM Coef Value", 
-          main="Linear Model Coefficients" )
-    lines(coefIdxs, coefVals, col="blue" )
-    dev.off()    
-    
-    if ( doPrint )
-        cat( "\n" )
-}
-
-###########
-# helper to de-clutter script code
-plotImportanceData <- function( varIndices, mdaVals, mdGiniVals, doPrint=FALSE ) {
-    
-    if ( doPrint )
-        pr( "plotting Random Forest variable importance() metrics" )
-    
-    # plot to screen and knitr
-    plot( varIndices, mdaVals, 
-          xlab="Variable Index", 
-          ylab="Importance MD Accuracy Value", 
-          main="Variable MD Accuracy/Importance",
-          pch=21, col="blue", bg="red" )
-    plot( varIndices, mdGiniVals,
-          xlab="Variable Index", 
-          ylab="Importance MD Gini Value", 
-          main="Variable MD Gini Importance",
-          pch=21, col="blue", bg="red" )
-    
-    # plot to file as well
-    png( "RfImpVarMetrics.png", height = 512, width = 900 )
-    par( family = "sans" )
-    par( mfrow = c( 1, 2 ) )
-    plot( varIndices, mdaVals, 
-          xlab="Variable Index", 
-          ylab="Importance MD Accuracy Value", 
-          main="Variable MD Accuracy/Importance",
-          pch=21, col="blue", bg="red" )
-    plot( varIndices, mdGiniVals,
-          xlab="Variable Index", 
-          ylab="Importance MD Gini Value", 
-          main="Variable MD Gini Importance",
-          pch=21, col="blue", bg="red" )
-    dev.off()
-}
-
-###########
-# helper function to subset, coerce data
-prepDf <- function( df ) {
-    ## discard first 7 columns - may not be good for general data sets
-    df <- df[ , 8:ncol( df ) ]
-    ## discard columns with number na/blanks > num rows in data frame
-    colNaSums <- apply( df, 2, function(x) { length( which ( is.na(x) | x == "" ) ) } )
-    df <- df[ ,colNaSums < nrow(df)/2 ]
-    ## coerce integers to numeric
-    for ( i in 1:ncol( df ) ) {
-        if ( class( df[ 1, i ] ) == "integer" )
-            df[ , i ] <- as.numeric( df[ , i ] )
-    }
-    df # Caller must do the shuffling
-}
-
-###########
-# a function which returns the numeric index of column in a data frame given the column name
-getColIdx <- function( df, colName ) {
-    grep( colName, colnames( df ) )
 }
